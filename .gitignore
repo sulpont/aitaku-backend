@@ -1,0 +1,6 @@
+__pycache__
+venv
+main.py.old
+aitaku-api-test.pem
+.DS_Store
+.env
