@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import psycopg2
 import os
+from auth import auth_router  # auth.pyからauth_routerをインポート
 
 load_dotenv()
 
@@ -16,6 +17,9 @@ app.add_middleware(
     allow_methods=["*"],  # 全てのHTTPメソッドを許可
     allow_headers=["*"],  # 全てのヘッダーを許可
 )
+
+# auth.pyからルーターを追加
+app.include_router(auth_router)
 
 # クラスでDB接続を管理
 class Database:
@@ -50,7 +54,7 @@ class Database:
 # ルートエンドポイント: "Hello Taxi"メッセージを表示
 @app.get("/")
 def read_root():
-    return {"message": "Hello Taxi!"}
+    return {"message": "Hello Taxi...!"}
 
 
 # RDSへの接続テスト用エンドポイント
