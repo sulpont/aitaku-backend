@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -7,6 +7,8 @@ from typing import Optional
 import os
 import psycopg2
 from pydantic import BaseModel
+import logging
+
 
 # JWTやパスワードの設定
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -14,6 +16,9 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# ブラックリストを定義（サインアウトしたトークンを保存）
+BLACKLIST = set()
 
 auth_router = APIRouter()
 
@@ -43,6 +48,7 @@ def get_user_from_db(email: str):
     cursor = conn.cursor()
     cursor.execute("SELECT email, password, sex FROM users WHERE email = %s", (email,))
     user = cursor.fetchone()
+    cursor.close()
     conn.close()
     if user:
         return {"email": user[0], "hashed_password": user[1], "sex": user[2]}
@@ -91,8 +97,26 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     else:
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY.encode('utf-8'), algorithm=ALGORITHM)
+    # encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+# トークンを無効化する関数
+def add_token_to_blacklist(token: str):
+    BLACKLIST.add(token)
+
+# トークンの検証時にブラックリストをチェックする
+def decode_access_token(token: str):
+    if token in BLACKLIST:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        return email
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 # サインインエンドポイント (emailとpasswordで認証)
 @auth_router.post("/token")
@@ -101,7 +125,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="メールアドレスまたはパスワードが間違っています",
             headers={"WWW-Authenticate": "Bearer"},
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -129,13 +153,17 @@ async def create_user(user: UserCreate):
 
     return {"message": "User created successfully"}
 
-# トークンの検証
-def decode_access_token(token: str):
+# サインアウトエンドポイント
+@auth_router.post("/signout")
+async def sign_out(token: str = Depends(oauth2_scheme)):
+    logging.info(f"Received token: {token}")  # ここで受信したトークンを出力
+    """
+    クライアントから送信されたJWTトークンを無効化
+    """
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-        return email
-    except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        add_token_to_blacklist(token)  # トークンをブラックリストに追加
+        return {"message": "サインアウトしました"}
+    except Exception as e:
+        logging.error(f"Signout error: {e}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="サインアウトに失敗しました")
+

@@ -23,22 +23,24 @@ app.include_router(auth_router)
 
 # クラスでDB接続を管理
 class Database:
-    def __init__(self):
+    def __enter__(self):
         # コンストラクタ内でDB接続を初期化
         try:
             self.conn = psycopg2.connect(
-                host=os.environ.get("DB_HOST"),
-                database=os.environ.get("DB_NAME"),  # データベース名
-                user=os.environ.get("DB_USER"),  # ユーザー名
-                password=os.environ.get("DB_PASSWORD")  # パスワード
+                host=os.getenv("DB_HOST"),
+                database=os.getenv("DB_NAME"),  # データベース名
+                user=os.getenv("DB_USER"),  # ユーザー名
+                password=os.getenv("DB_PASSWORD")  # パスワード
             )
             self.cursor = self.conn.cursor()
             # スキーマの設定をコンストラクタ内で行う
             self.cursor.execute("SET search_path TO public;")
+            return self
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"DB connection error: {str(e)}")
 
-    def close(self):
+    def __exit__(self, exc_type, exc_value, traceback):
+        # リソースをクリーンアップ
         self.cursor.close()
         self.conn.close()
 
@@ -54,18 +56,17 @@ class Database:
 # ルートエンドポイント: "Hello Taxi"メッセージを表示
 @app.get("/")
 def read_root():
-    return {"message": "Hello Taxi...!"}
+    return {"message": "Hello Taxi!"}
 
 
 # RDSへの接続テスト用エンドポイント
 @app.get("/test-db-connection")
 def test_db_connection():
     try:
-        db = Database()  # DB接続をインスタンス化
-        db.cursor.execute("SELECT 1;")  # データベースの接続テストクエリ
-        result = db.cursor.fetchone()
-        db.close()
-        return {"message": f"DB connection successful: {result[0]}"}
+        with Database() as db:  # DB接続をインスタンス化
+            db.cursor.execute("SELECT 1;")  # データベースの接続テストクエリ
+            result = db.cursor.fetchone()
+            return {"message": f"DB connection successful: {result[0]}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"DB connection error: {str(e)}")
 
@@ -74,9 +75,8 @@ def test_db_connection():
 @app.get("/get-email/{user_name}")
 def get_email(user_name: str):
     try:
-        db = Database()  # インスタンスを作成
-        result = db.get_email_by_username(user_name)
-        db.close()
+        with Database() as db:  # インスタンスを作成
+            result = db.get_email_by_username(user_name)
 
         if result is None:
             raise HTTPException(status_code=404, detail="User not found")
