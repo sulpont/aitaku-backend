@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import psycopg2
 import os
 from auth import auth_router  # auth.pyからauth_routerをインポート
+from search import search_router  # search.pyのルーターをインポート
 
 load_dotenv()
 
@@ -20,6 +21,9 @@ app.add_middleware(
 
 # auth.pyからルーターを追加
 app.include_router(auth_router)
+
+# search用ルーター
+app.include_router(search_router)
 
 # クラスでDB接続を管理
 class Database:
