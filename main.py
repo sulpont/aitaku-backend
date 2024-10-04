@@ -5,6 +5,11 @@ import psycopg2
 import os
 from auth import auth_router  # auth.pyからauth_routerをインポート
 from search import search_router  # search.pyのルーターをインポート
+from orders import order_router  # orders.pyのルーターをインポート
+from search_candidates import search_candidates_router  # search_candidates.pyのルーターをインポート
+from update_accept_order import update_accept_order_router, matching_router
+from check_requested import check_requested_router
+
 
 load_dotenv()
 
@@ -22,8 +27,21 @@ app.add_middleware(
 # auth.pyからルーターを追加
 app.include_router(auth_router)
 
-# search用ルーター
+# search.py用ルーターを追加
 app.include_router(search_router)
+
+# orders.py用ルーターを追加
+app.include_router(order_router)
+
+# search_candidates.py用ルーターを追加
+app.include_router(search_candidates_router)
+
+# update_accept_order.py用
+app.include_router(update_accept_order_router)
+app.include_router(matching_router)
+
+# check_requested.py用
+app.include_router(check_requested_router)
 
 # クラスでDB接続を管理
 class Database:
