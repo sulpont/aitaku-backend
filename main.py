@@ -9,7 +9,7 @@ from orders import order_router  # orders.pyのルーターをインポート
 from search_candidates import search_candidates_router  # search_candidates.pyのルーターをインポート
 from update_accept_order import update_accept_order_router, matching_router
 from check_requested import check_requested_router
-
+from send_email import send_email_router
 
 load_dotenv()
 
@@ -42,6 +42,9 @@ app.include_router(matching_router)
 
 # check_requested.py用
 app.include_router(check_requested_router)
+
+# send_email_router.py用
+app.include_router(send_email_router)
 
 # クラスでDB接続を管理
 class Database:

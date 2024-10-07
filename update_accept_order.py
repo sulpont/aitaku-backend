@@ -81,7 +81,7 @@ def update_accept_order(criteria: OrderSearchCriteria):
 
         query = """
             UPDATE public.orders
-            SET status='approved_wating', aitaku_user_id = %s
+            SET status='approved_waiting', aitaku_user_id = %s
             WHERE order_id = %s;
         """
         values = (aitaku_user_id, criteria.my_order_id,)  # タプルとして渡す
